@@ -346,6 +346,12 @@ def parse_args(args):
         help="Notes if logging with wandb"
     )
     parser.add_argument(
+        "--wandb-entity",
+        type=str,
+        default=None,
+        help="Name of the entity if logging with wandb."
+    )
+    parser.add_argument(
         "--wandb-project-name",
         type=str,
         default='open-clip',

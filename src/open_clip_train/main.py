@@ -437,10 +437,12 @@ def main(args):
         if args.val_data is not None:
             args.val_sz = data["val"].dataloader.num_samples
         # you will have to configure this for your project!
+        import hashlib
         wandb.init(
+            entity=args.wandb_entity,
             project=args.wandb_project_name,
             name=args.name,
-            id=args.name,
+            id=hashlib.sha1((args.wandb_project_name + args.name).encode("utf-8")).hexdigest(),
             notes=args.wandb_notes,
             tags=[],
             resume='auto' if args.resume == "latest" else None,
