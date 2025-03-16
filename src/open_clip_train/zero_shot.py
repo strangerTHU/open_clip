@@ -74,8 +74,8 @@ def zero_shot_eval(model, data, epoch, args, tokenizer=None):
     results = {}
     if 'imagenet-val' in data:
         top1, top5 = run(model, classifier, data['imagenet-val'].dataloader, args)
-        results['imagenet-zeroshot-val-top1'] = top1
-        results['imagenet-zeroshot-val-top5'] = top5
+        results['classification@1'] = top1
+        results['classification@5'] = top5
     if 'imagenet-v2' in data:
         top1, top5 = run(model, classifier, data['imagenet-v2'].dataloader, args)
         results['imagenetv2-zeroshot-val-top1'] = top1
