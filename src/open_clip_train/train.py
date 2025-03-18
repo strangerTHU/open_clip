@@ -231,7 +231,7 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
             }            
             log_data.update({name:val.val for name,val in losses_m.items()})
 
-            # log_data = {"train/" + name: val for name, val in log_data.items()}
+            log_data = {"train/" + name: val for name, val in log_data.items()}
 
             if tb_writer is not None:
                 for name, val in log_data.items():
@@ -332,7 +332,7 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None):
         + "\t".join([f"{k}: {round(v, 4):.4f}" for k, v in metrics.items()])
     )
 
-    log_data = {name: val for name, val in metrics.items()}
+    log_data = {"eval/" + name: val for name, val in metrics.items()}
 
     if args.save_logs:
         if tb_writer is not None:
