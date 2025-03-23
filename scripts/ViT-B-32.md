@@ -33,16 +33,4 @@ python -m open_clip_train.simple_main \
 --logs exp_dongyun \
 --save-checkpoint-steps 1000 \
 --evaluation-steps 5000 --resume latest
-
---dataset-type webdataset \
---batch-size 64 --imagenet-val /dataset/imagenet/val --model ViT-B-32 \
---data-dir /dataset/coyo-700m_full_webdata/part_00000 --wds-meta-path data/coyo_part_00000.json \
---lr 0.0005 --lr-scheduler const --warmup 10000 \
---total-steps 400000 \
---beta1 0.9 --beta2 0.98 \
---precision amp_bf16 \
---name test4 \
---logs exp_dongyun \
---save-checkpoint-steps 10 \
---evaluation-steps 50 --resume latest
 ```
