@@ -248,7 +248,7 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
     # end for
 
 
-def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None):
+def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_index=None):
     metrics = {}
     if not is_master(args):
         return metrics
@@ -348,7 +348,7 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None):
         if 'train' in data:
             dataloader = data['train'].dataloader
             num_batches_per_epoch = dataloader.num_batches // args.accum_freq
-            step = num_batches_per_epoch * epoch
+            step = num_batches_per_epoch * epoch + batch_index if batch_index is not None else num_batches_per_epoch * epoch
         else:
             step = None
         log_data['epoch'] = epoch

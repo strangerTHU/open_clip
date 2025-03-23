@@ -3,7 +3,7 @@
 models/
 features/
 results/
-
+src/data/
 tests/data/
 *.pt
 src/exp*/

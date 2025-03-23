@@ -16,10 +16,15 @@ import torchvision.datasets as datasets
 import webdataset as wds
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, IterableDataset, get_worker_info
-from torch.utils.data.distributed import DistributedSampler
 from webdataset.filters import _shuffle
 from webdataset.tariterators import base_plus_ext, url_opener, tar_file_expander, valid_sample
+from .train_dist_sampler import TrainDistSampler
+from typing import Optional
 
+from .dist_utils import (
+    get_dist_size,
+    get_dist_rank
+)
 try:
     import horovod.torch as hvd
 except ImportError:
@@ -61,14 +66,16 @@ class SharedEpoch:
 @dataclass
 class DataInfo:
     dataloader: DataLoader
-    sampler: DistributedSampler = None
+    sampler: TrainDistSampler = None
     shared_epoch: SharedEpoch = None
 
-    def set_epoch(self, epoch):
+    def set_epoch(self, epoch: int, iteration: Optional[int] = None):
         if self.shared_epoch is not None:
             self.shared_epoch.set_value(epoch)
-        if self.sampler is not None and isinstance(self.sampler, DistributedSampler):
-            self.sampler.set_epoch(epoch)
+        if self.sampler is not None and isinstance(self.sampler, TrainDistSampler):
+            self.sampler.set_epoch(epoch, iteration)
+        if isinstance(self.dataloader, wds.WebLoader):
+            self.dataloader.skip(iteration)
 
 
 def expand_urls(urls, weights=None):
@@ -414,13 +421,28 @@ def get_wds_dataset(args, preprocess_img, is_train, epoch=0, floor=False, tokeni
         # last batches are partial, eval is done on single (master) node
         num_batches = math.ceil(num_samples / args.batch_size)
 
-    dataloader = wds.WebLoader(
+    sampler = TrainDistSampler(
+        dataset,
+        num_replicas=get_dist_size(),
+        rank=get_dist_rank(),
+        seed=args.seed,
+        drop_last=True
+    )
+    dataloader = DataLoader(
         dataset,
         batch_size=None,
         shuffle=False,
         num_workers=args.workers,
-        persistent_workers=args.workers > 0,
+        sampler=sampler
     )
+    return DataInfo(dataloader=dataloader, sampler=sampler, shared_epoch=shared_epoch)
+    # dataloader = wds.WebLoader(
+    #     dataset,
+    #     batch_size=None,
+    #     shuffle=False,
+    #     num_workers=args.workers,
+    #     persistent_workers=args.workers > 0,
+    # )
 
     # FIXME not clear which approach is better, with_epoch before vs after dataloader?
     # hoping to resolve via https://github.com/webdataset/webdataset/issues/169
@@ -437,10 +459,10 @@ def get_wds_dataset(args, preprocess_img, is_train, epoch=0, floor=False, tokeni
     #     num_batches = math.ceil(num_samples / args.batch_size)
 
     # add meta-data to dataloader instance for convenience
-    dataloader.num_batches = num_batches
-    dataloader.num_samples = num_samples
+    # dataloader.num_batches = num_batches
+    # dataloader.num_samples = num_samples
 
-    return DataInfo(dataloader=dataloader, shared_epoch=shared_epoch)
+    # return DataInfo(dataloader=dataloader, shared_epoch=shared_epoch)
 
 
 def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
@@ -455,7 +477,7 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
         tokenizer=tokenizer
     )
     num_samples = len(dataset)
-    sampler = DistributedSampler(dataset) if args.distributed and is_train else None
+    sampler = TrainDistSampler(dataset) if args.distributed and is_train else None
     shuffle = is_train and sampler is None
 
     dataloader = DataLoader(
@@ -505,7 +527,7 @@ def get_synthetic_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None
     dataset = SyntheticDataset(
         transform=preprocess_fn, image_size=image_size, dataset_size=args.train_num_samples, tokenizer=tokenizer)
     num_samples = len(dataset)
-    sampler = DistributedSampler(dataset) if args.distributed and is_train else None
+    sampler = TrainDistSampler(dataset) if args.distributed and is_train else None
     shuffle = is_train and sampler is None
 
     dataloader = DataLoader(

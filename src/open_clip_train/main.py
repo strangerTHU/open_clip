@@ -477,7 +477,7 @@ def main(args):
         return
 
     loss = create_loss(args)
-
+    import ipdb; ipdb.set_trace()
     for epoch in range(start_epoch, args.epochs):
         if is_master(args):
             logging.info(f'Start epoch {epoch}')
