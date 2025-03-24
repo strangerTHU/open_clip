@@ -145,27 +145,19 @@ def main(args):
         resume_from = None
         checkpoint_path = args.checkpoint_path
         # If using remote_sync, need to check the remote instead of the local checkpoints folder.
-        if args.remote_sync is not None:
-            checkpoint_path = os.path.join(args.remote_sync, args.name, "checkpoints")
-            if args.save_most_recent:
-                print('Error. Cannot use save-most-recent with remote_sync and resume latest.')
-                return -1
-            if args.remote_sync_protocol != 's3':
-                print('Error. Sync protocol not supported when using resume latest.')
-                return -1
+        # if args.remote_sync is not None:
+        #     checkpoint_path = os.path.join(args.remote_sync, args.name, "checkpoints")
+        #     if args.save_most_recent:
+        #         print('Error. Cannot use save-most-recent with remote_sync and resume latest.')
+        #         return -1
+        #     if args.remote_sync_protocol != 's3':
+        #         print('Error. Sync protocol not supported when using resume latest.')
+        #         return -1
         if is_master():
-            # Checking for existing checkpoint via master rank only. It is possible for
-            # different rank processes to see different files if a shared file-system is under
-            # stress, however it's very difficult to fully work around such situations.
-            if args.save_most_recent:
-                # if --save-most-recent flag is set, look for latest at a fixed filename
-                resume_from = os.path.join(checkpoint_path, LATEST_CHECKPOINT_NAME)
-                if not os.path.exists(resume_from):
-                    # If no latest checkpoint has been saved yet, don't try to resume
-                    resume_from = None
-            else:
-                # otherwise, list checkpoint dir contents and pick the newest checkpoint
-                resume_from = get_latest_checkpoint(checkpoint_path, remote=args.remote_sync is not None)
+            resume_from = os.path.join(checkpoint_path, LATEST_CHECKPOINT_NAME)
+            if not os.path.exists(resume_from):
+                # If no latest checkpoint has been saved yet, don't try to resume
+                resume_from = None
             if resume_from:
                 logging.info(f'Found latest resume checkpoint at {resume_from}.')
             else:
