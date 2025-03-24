@@ -920,7 +920,7 @@ class TextTransformer(nn.Module):
             else:
                 self.text_projection = nn.Parameter(torch.empty(width, output_dim))
 
-        # self.init_parameters()
+        self.init_parameters()
 
     def init_parameters(self):
         nn.init.normal_(self.token_embedding.weight, std=0.02)
