@@ -35,7 +35,9 @@ from .dist_utils import (
     get_dist_rank,
     get_dist_size,
     is_dist_initialized,
-    is_master
+    is_master,
+    sync_tensor,
+    sync_object
 )
 from .data_provider.coyo import CoyoDataProvider, CoyoDataProviderConfig
 from PIL import Image, ImageFile
@@ -77,11 +79,13 @@ def get_latest_checkpoint(path: str, remote : bool):
 def main(args):
     args = parse_args(args)
     dist_init()
+    if is_dist_initialized():
+        torch.cuda.set_device(get_dist_local_rank())
     args.distributed = is_dist_initialized()
     args.rank = get_dist_rank()
     args.local_rank = get_dist_local_rank()
     args.world_size = get_dist_size()
-    device = torch.device(f"cuda:{get_dist_local_rank()}")
+    device = torch.device("cuda")
     cfg: CoyoDataProviderConfig = CoyoDataProviderConfig()
     cfg.data_dir = args.data_dir
     cfg.wds_meta_path = args.wds_meta_path
@@ -133,7 +137,7 @@ def main(args):
             return -1
 
     # Setup text logger
-    args.log_level = logging.DEBUG if args.debug else logging.INFO
+    args.log_level = logging.INFO
     setup_logging(args.log_path, args.log_level)
 
     # Setup wandb, tensorboard, checkpoint logging
@@ -162,6 +166,8 @@ def main(args):
                 logging.info(f'Found latest resume checkpoint at {resume_from}.')
             else:
                 logging.info(f'No latest resume checkpoint found in {checkpoint_path}.')
+        if is_dist_initialized():
+            resume_from = sync_object(resume_from)[0]
         args.resume = resume_from
 
 
@@ -184,7 +190,7 @@ def main(args):
     if isinstance(args.force_image_size, (tuple, list)) and len(args.force_image_size) == 1:
         # arg is nargs, single (square) image size list -> int
         args.force_image_size = args.force_image_size[0]
-    random_seed(args.seed, 0)
+    random_seed(args.seed, get_dist_rank())
     model_kwargs = {}
     if args.siglip:
         model_kwargs['init_logit_scale'] = np.log(10)  # different from CLIP
@@ -209,7 +215,6 @@ def main(args):
         cache_dir=args.cache_dir,
         **model_kwargs,
     )
-
     random_seed(args.seed, get_dist_rank())
 
     if args.trace:
@@ -416,9 +421,11 @@ def main(args):
         if epoch == start_epoch:
             data_provider.sampler.set_epoch(epoch)
             data_provider.set_batch_index(batch_index)
+            logging.info(f"Starting from epoch {epoch}, batch {batch_index}.")
         else:
             data_provider.sampler.set_epoch(epoch)
             batch_index = 0
+            logging.info(f"Starting from epoch {epoch}, batch 0.")
         dataloader = data_provider.data_loader
         num_batches_per_epoch = len(dataloader)
         sample_digits = math.ceil(math.log(len(dataloader.dataset) + 1, 10))
@@ -432,7 +439,6 @@ def main(args):
 
             if not args.skip_scheduler:
                 scheduler(step)
-
             images, texts = batch
             texts = texts["caption"]
             texts = tokenizer(texts)
@@ -449,10 +455,8 @@ def main(args):
 
                 total_loss = sum(losses.values())
                 losses["loss"] = total_loss
-
             batch_index += 1
             backward(total_loss, scaler)
-
             if scaler is not None:
                 if args.grad_clip_norm is not None:
                     scaler.unscale_(optimizer)
@@ -463,7 +467,6 @@ def main(args):
                 if args.grad_clip_norm is not None:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip_norm, norm_type=2.0)
                 optimizer.step()
-
             # Note: we clamp to 4.6052 = ln(100), as in the original paper.
             with torch.no_grad():
                 unwrap_model(model).logit_scale.clamp_(0, math.log(100))
@@ -540,10 +543,21 @@ def main(args):
                 torch.save(checkpoint_dict, tmp_save_path)
                 os.replace(tmp_save_path, latest_save_path)
                 logging.info(f"Saved checkpoint at epoch {epoch}, batch {batch_index}.")
+            
             if is_master() and (batch_index % args.evaluation_steps == 0):
                 evaluate(model, data, epoch, args, tb_writer=writer, tokenizer=tokenizer, batch_index=batch_index)
+                dist_barrier()
+            # if args.debug:
+            #     images = sync_tensor(images, "cat")
+            #     data_index = sync_tensor(batch[1]["index"].cuda(), "cat")
+            #     if is_master():
+            #         logging.info(f"step: {batch_index} loss: {total_loss.item()}, images: {images.sum().item()}, data_index: {data_index}")
+            #     if batch_index == args.debug_steps:
+            #         logging.info("Debugging finished.")
+            #         exit(0)
             if batch_index + epoch * num_batches_per_epoch >= args.total_steps:
                 break
+            dist_barrier()
         # end for
         # completed_epoch = epoch + 1
 

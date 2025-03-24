@@ -486,6 +486,7 @@ def parse_args(args):
     parser.add_argument("--data-dir", type=str, default=None, help="Path to training data directory.")
     parser.add_argument("--wds-meta-path", type=str, default=None, help="Path to webdataset metadata file.")
     parser.add_argument("--total-steps", type=int, default=None, help="Total number of steps to train for.")
+    parser.add_argument("--debug-steps", type=int, default=None, help="Total number of steps run in debug mode.")
     args = parser.parse_args(args)
 
     if 'timm' not in args.opt:

@@ -58,6 +58,20 @@ def dist_barrier() -> None:
 def get_dist_local_rank() -> int:
     return int(os.environ["LOCAL_RANK"])
 
+def sync_tensor(tensor: torch.Tensor | float, reduce="mean") -> torch.Tensor | list[torch.Tensor]:
+    if not is_dist_initialized():
+        return tensor
+    if not isinstance(tensor, torch.Tensor):
+        tensor = torch.Tensor(1).fill_(tensor).cuda()
+    tensor_list = [torch.empty_like(tensor) for _ in range(get_dist_size())]
+    torch.distributed.all_gather(tensor_list, tensor.contiguous(), async_op=False)
+    if reduce == "cat":
+        return torch.cat(tensor_list, dim=0)
+    elif reduce == "root":
+        return tensor_list[0]
+    else:
+        return tensor_list
+
 def sync_object(obj: T) -> list[T]:
     if not is_dist_initialized():
         return [obj]
