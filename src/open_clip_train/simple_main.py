@@ -90,9 +90,8 @@ def main(args):
     cfg.data_dir = args.data_dir
     cfg.wds_meta_path = args.wds_meta_path
     cfg.batch_size = args.batch_size
-    cfg.mean = (0.48145466,0.4578275,0.40821073)
-    cfg.std = (0.26862954,0.26130258,0.27577711)
-    cfg.resolution = 224
+    cfg.resolution = [256,256]
+    cfg.size_transform = "ResizeBicubic"
     data_provider = CoyoDataProvider(cfg)
     args.distill = None
     if torch.cuda.is_available():
@@ -215,6 +214,10 @@ def main(args):
         cache_dir=args.cache_dir,
         **model_kwargs,
     )
+    from .init import init_modules
+    init_modules(model)
+    model.logit_scale.data.fill_(math.log(10))
+    model.logit_bias.data.fill_(-10)
     random_seed(args.seed, get_dist_rank())
 
     if args.trace:
@@ -279,9 +282,8 @@ def main(args):
     else:
         # If some params are not passed, we use the default values based on model name.
         # import ipdb; ipdb.set_trace()
-        exclude = lambda n, p: p.ndim < 2 or "bn" in n or "ln" in n or "bias" in n or 'logit_scale' in n
+        exclude = lambda n, p: p.ndim < 2 or "bn" in n or "ln" in n or "bias" in n or 'logit_scale' in n or 'logit_bias' in n
         include = lambda n, p: not exclude(n, p)
-
         named_parameters = list(model.named_parameters())
         gain_or_bias_params = [p for n, p in named_parameters if exclude(n, p) and p.requires_grad]
         rest_params = [p for n, p in named_parameters if include(n, p) and p.requires_grad]
@@ -474,7 +476,7 @@ def main(args):
             batch_time_m.update(time.time() - end)
             end = time.time()
             batch_count = batch_index + 1
-            if is_master() and (batch_index % args.log_every_n_steps == 0 or batch_count == num_batches_per_epoch):
+            if is_master() and ((batch_index + epoch * num_batches_per_epoch) % args.log_every_n_steps == 0 or batch_count == num_batches_per_epoch):
                 batch_size = len(images)
                 num_samples = batch_count * batch_size * args.world_size
                 samples_per_epoch = len(dataloader.dataset)
@@ -524,7 +526,8 @@ def main(args):
                 # resetting batch / data time meters per log window
                 batch_time_m.reset()
                 data_time_m.reset()
-            if is_master() and (batch_index % args.save_checkpoint_steps == 0):
+            # import ipdb; ipdb.set_trace()
+            if is_master() and ((batch_index + epoch * num_batches_per_epoch) % args.save_checkpoint_steps == 0):
                 checkpoint_dict = {
                     "epoch": epoch,
                     "batch_index": batch_index,
@@ -544,8 +547,8 @@ def main(args):
                 os.replace(tmp_save_path, latest_save_path)
                 logging.info(f"Saved checkpoint at epoch {epoch}, batch {batch_index}.")
             
-            if is_master() and (batch_index % args.evaluation_steps == 0):
-                evaluate(model, data, epoch, args, tb_writer=writer, tokenizer=tokenizer, batch_index=batch_index)
+            if is_master() and ((batch_index + epoch * num_batches_per_epoch) % args.evaluation_steps == 0):
+                evaluate(model, data, epoch, args, tb_writer=writer, tokenizer=tokenizer, batch_index=batch_index, num_batches_per_epoch=num_batches_per_epoch)
                 dist_barrier()
             # if args.debug:
             #     images = sync_tensor(images, "cat")

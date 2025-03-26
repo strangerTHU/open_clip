@@ -31,6 +31,8 @@ class CLIPCoreDataProvider(BaseDataProvider):
                 transforms.Resize(self.cfg.resolution),
                 transforms.CenterCrop(self.cfg.resolution)
             ])
+        elif self.cfg.size_transform == "ResizeBicubic":
+            size_transform = transforms.Resize(self.cfg.resolution, interpolation=transforms.InterpolationMode.BICUBIC)
         else:
             raise ValueError(f"size transform {self.cfg.size_transform} is not supported")
         transforms_list = [

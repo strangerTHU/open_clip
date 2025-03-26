@@ -248,7 +248,7 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
     # end for
 
 
-def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_index=None):
+def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_index=None, num_batches_per_epoch=None):
     metrics = {}
     if not is_master(args):
         return metrics
@@ -326,9 +326,9 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_ind
 
     if not metrics:
         return metrics
-
+    step = num_batches_per_epoch * epoch + batch_index
     logging.info(
-        f"Eval Epoch: {epoch} "
+        f"Eval step: {step} "
         + "\t".join([f"{k}: {round(v, 4):.4f}" for k, v in metrics.items()])
     )
 
@@ -345,13 +345,14 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_ind
 
     if args.wandb:
         assert wandb is not None, 'Please install wandb.'
-        if 'train' in data:
-            dataloader = data['train'].dataloader
-            num_batches_per_epoch = dataloader.num_batches // args.accum_freq
-            step = num_batches_per_epoch * epoch + batch_index if batch_index is not None else num_batches_per_epoch * epoch
-        else:
-            step = None
-        log_data['epoch'] = epoch
+        # if 'train' in data:
+        #     dataloader = data['train'].dataloader
+        #     num_batches_per_epoch = dataloader.num_batches // args.accum_freq
+        #     step = num_batches_per_epoch * epoch + batch_index if batch_index is not None else num_batches_per_epoch * epoch
+        # else:
+        #     step = None
+        # log_data['epoch'] = epoch
+        step = num_batches_per_epoch * epoch + batch_index
         wandb.log(log_data, step=step)
 
     return metrics
