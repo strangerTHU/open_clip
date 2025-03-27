@@ -140,7 +140,7 @@ def main(args):
     setup_logging(args.log_path, args.log_level)
 
     # Setup wandb, tensorboard, checkpoint logging
-    args.wandb = 'wandb' in args.report_to or 'all' in args.report_to
+    args.wandb = True
     # args.tensorboard = 'tensorboard' in args.report_to or 'all' in args.report_to
     args.checkpoint_path = os.path.join(log_base_path, "checkpoints")
     os.makedirs(args.checkpoint_path, exist_ok=True)
@@ -549,7 +549,6 @@ def main(args):
             
             if is_master() and ((batch_index + epoch * num_batches_per_epoch) % args.evaluation_steps == 0):
                 evaluate(model, data, epoch, args, tb_writer=writer, tokenizer=tokenizer, batch_index=batch_index, num_batches_per_epoch=num_batches_per_epoch)
-                dist_barrier()
             # if args.debug:
             #     images = sync_tensor(images, "cat")
             #     data_index = sync_tensor(batch[1]["index"].cuda(), "cat")

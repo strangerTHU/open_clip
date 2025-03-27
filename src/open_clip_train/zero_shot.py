@@ -42,14 +42,14 @@ def run(model, classifier, dataloader, args):
     return top1, top5
 
 
-def zero_shot_eval(model, data, epoch, args, tokenizer=None):
-    if 'imagenet-val' not in data and 'imagenet-v2' not in data:
-        return {}
-    if args.zeroshot_frequency == 0:
-        return {}
-    if (epoch % args.zeroshot_frequency) != 0 and epoch != args.epochs:
-        return {}
-    if args.distributed and not args.horovod:
+def zero_shot_eval(model, data, args, tokenizer=None):
+    # if 'imagenet-val' not in data and 'imagenet-v2' not in data:
+    #     return {}
+    # if args.zeroshot_frequency == 0:
+    #     return {}
+    # if (epoch % args.zeroshot_frequency) != 0 and epoch != args.epochs:
+    #     return {}
+    if args.distributed:
         model = model.module
 
     logging.info('Starting zero-shot imagenet.')
@@ -76,10 +76,10 @@ def zero_shot_eval(model, data, epoch, args, tokenizer=None):
         top1, top5 = run(model, classifier, data['imagenet-val'].dataloader, args)
         results['classification@1'] = top1
         results['classification@5'] = top5
-    if 'imagenet-v2' in data:
-        top1, top5 = run(model, classifier, data['imagenet-v2'].dataloader, args)
-        results['imagenetv2-zeroshot-val-top1'] = top1
-        results['imagenetv2-zeroshot-val-top5'] = top5
+    # if 'imagenet-v2' in data:
+    #     top1, top5 = run(model, classifier, data['imagenet-v2'].dataloader, args)
+    #     results['imagenetv2-zeroshot-val-top1'] = top1
+    #     results['imagenetv2-zeroshot-val-top5'] = top5
 
     logging.info('Finished zero-shot imagenet.')
 

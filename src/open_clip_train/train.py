@@ -255,7 +255,7 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None, batch_ind
     device = torch.device(args.device)
     model.eval()
 
-    zero_shot_metrics = zero_shot_eval(model, data, epoch, args, tokenizer=tokenizer)
+    zero_shot_metrics = zero_shot_eval(model, data, args, tokenizer=tokenizer)
     metrics.update(zero_shot_metrics)
 
     autocast = get_autocast(args.precision, device_type=device.type)
