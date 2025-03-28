@@ -214,6 +214,15 @@ def main(args):
         cache_dir=args.cache_dir,
         **model_kwargs,
     )
+    # import ipdb; ipdb.set_trace()
+    import torchvision.transforms as transforms
+    from .utils.image import convert_image_to_rgb
+    preprocess_train = preprocess_val = transforms.Compose([
+        convert_image_to_rgb,
+        transforms.Resize([256,256], interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
+        transforms.Normalize(0.5, 0.5),
+    ])
     from .init import init_modules
     init_modules(model)
     model.logit_scale.data.fill_(math.log(10))
